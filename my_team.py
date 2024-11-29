@@ -217,10 +217,10 @@ class MyTeamOffensive(MyTeamBaseAgent):
 
     def choose_action(self, game_state):
         """
-        Choose the best offensive action.
+        Choose the best defensive action.
         """
         actions = game_state.get_legal_actions(self.index)
-        best_actions = []
+        
         best_action = None
         highest_q_value = -9999       
         if not actions:
@@ -228,11 +228,12 @@ class MyTeamOffensive(MyTeamBaseAgent):
         else:
             for action in actions:
                 current_q_value = self.get_offensive_features(game_state,action)
-                if current_q_value >= highest_q_value:
+                if current_q_value > highest_q_value:
                     highest_q_value = current_q_value
-                    best_actions.append(action) 
-            best_action = random.choice(best_actions)
-           
+                    best_action = action
+                if current_q_value == highest_q_value:
+                    best_action = random.choice([best_action,action])
+            
             return best_action
 
 
@@ -266,11 +267,21 @@ class MyTeamOffensive(MyTeamBaseAgent):
         num_food = len(food_list)
         #oFeatures['next_food_score'] = -len(food_list)  # self.getScore(successor)
         capsules_list = self.get_capsules(game_state)
+        
+        
         width = game_state.data.layout.width
         height = game_state.data.layout.height
+        middle_width = 0
         
-        middle_of_board = [(width/2 - 1, y) for y in range(height)]
+        
 
+        if(game_state.is_on_red_team(self.index)):
+            middle_width = width/2 - 1
+            
+        else:
+            middle_width = width/2
+            
+        middle_of_board = [(middle_width,y) for y in range(height)]
         
         distance_to_food = 0
         distance_to_capsule = 0
@@ -299,9 +310,9 @@ class MyTeamOffensive(MyTeamBaseAgent):
             dsitance_to_base = min([self.get_maze_distance(my_pos,position) for position in middle_of_board]) * -5.0
             #oFeatures['distance_to_base'] = min_distance
 
-        if action == Directions.STOP: stop_penalty = 1
+        if action == Directions.STOP: stop_penalty = -100
         rev = Directions.REVERSE[game_state.get_agent_state(self.index).configuration.direction]
-        if action == rev: reverse_penalty = 1
+        if action == rev: reverse_penalty = -10
         
         score = distance_to_food + distance_to_capsule + distance_to_food_scared + distance_to_base + stop_penalty + reverse_penalty
         return score
@@ -323,7 +334,7 @@ class MyTeamDefensive(MyTeamBaseAgent):
         Choose the best defensive action.
         """
         actions = game_state.get_legal_actions(self.index)
-        best_actions = []
+        
         best_action = None
         highest_q_value = -9999       
         if not actions:
@@ -331,10 +342,11 @@ class MyTeamDefensive(MyTeamBaseAgent):
         else:
             for action in actions:
                 current_q_value = self.get_defensive_features(game_state,action)
-                if current_q_value >= highest_q_value:
+                if current_q_value > highest_q_value:
                     highest_q_value = current_q_value
-                    best_actions.append(action) 
-            best_action = random.choice(best_actions)
+                    best_action = action
+                if current_q_value == highest_q_value:
+                    best_action = random.choice([best_action,action])
             
             return best_action
 
@@ -371,6 +383,15 @@ class MyTeamDefensive(MyTeamBaseAgent):
         
         width = game_state.data.layout.width
         height = game_state.data.layout.height
+        middle_width = 0
+        middle_height = 0
+
+        if(game_state.is_on_red_team(self.index)):
+            middle_width = width/2 - 1
+            middle_height = height/2 - 1
+        else:
+            middle_width = width/2
+            middle_height = height/2
         
         
         distance_to_food = 0
@@ -395,13 +416,13 @@ class MyTeamDefensive(MyTeamBaseAgent):
             #dFeatures['invader_distance'] = min(dists)
         
         #dFeatures['distance_to_middle'] = min([self.get_maze_distance(my_pos,(width/2 - 1, height / 2 - 1))])
-        distance_to_middle = min([self.get_maze_distance(my_pos,(width/2 - 1, height / 2 - 1))]) * -3.0
+        distance_to_middle = min([self.get_maze_distance(my_pos,(middle_width, middle_height))]) * -3.0
 
         scared_team = [agent for agent in self.get_team(game_state) 
                      if game_state.get_agent_state(agent).scared_timer > 0]  
     
         if scared_team:
-            distance_to_middle_scared = min([self.get_maze_distance(my_pos, (width/2 - 1, height / 2 - 1))]) * -5.0
+            distance_to_middle_scared = min([self.get_maze_distance(my_pos, (middle_width, middle_height))]) * -5.0
             #dFeatures['distance_to_middle_scared'] = min_distance
 
 
