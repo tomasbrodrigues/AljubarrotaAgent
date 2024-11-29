@@ -192,12 +192,11 @@ class MyTeamBaseAgent(CaptureAgent):
     def init(self, index, time_for_computing=.1):
         super().init(index, time_for_computing)
         self.start = None
-        self.food_carried = 0
 
     def register_initial_state(self, game_state):
         self.start = game_state.get_agent_position(self.index)
         CaptureAgent.register_initial_state(self, game_state)
-        self.food_carried = 0
+        
 
     def get_successor(self, game_state, action):
         """
@@ -228,14 +227,12 @@ class MyTeamOffensive(MyTeamBaseAgent):
             return None
         else:
             for action in actions:
-                current_q_value = self.evaluate(game_state,action)
+                current_q_value = self.get_offensive_features(game_state,action)
                 if current_q_value >= highest_q_value:
                     highest_q_value = current_q_value
                     best_actions.append(action) 
             best_action = random.choice(best_actions)
-            if(game_state.get_agent_state(self.index).is_pacman):
-                self.update_food_carried(game_state,best_action)
-
+           
             return best_action
 
 
@@ -245,7 +242,7 @@ class MyTeamOffensive(MyTeamBaseAgent):
         """
         weights = self.get_offensive_weights(game_state, action)
         if(game_state.get_agent_state(self.index).is_pacman):
-            return self.get_offensive_features(game_state,action) * weights'''
+            return self.get_offensive_features(game_state,action) * weights
     def evaluate(self, game_state, action):
     
         features = self.get_offensive_features(game_state, action)
@@ -256,63 +253,65 @@ class MyTeamOffensive(MyTeamBaseAgent):
             weight = weights.get(feature, 0)  # Default weight to 0 if the feature is missing
             score += value * weight
 
-        return score
+        return score'''
 
 
     def get_offensive_features(self,game_state,action):
-        oFeatures = util.Counter()
+        #oFeatures = util.Counter()
         successor = self.get_successor(game_state, action)
-        oFeatures['successor_score'] = self.get_score(successor)
+       
         my_state = successor.get_agent_state(self.index)
         my_pos = my_state.get_position()
         food_list = self.get_food(successor).as_list()
         num_food = len(food_list)
-        oFeatures['next_food_score'] = -len(food_list)  # self.getScore(successor)
+        #oFeatures['next_food_score'] = -len(food_list)  # self.getScore(successor)
         capsules_list = self.get_capsules(game_state)
         width = game_state.data.layout.width
         height = game_state.data.layout.height
         
         middle_of_board = [(width/2 - 1, y) for y in range(height)]
+
         
+        distance_to_food = 0
+        distance_to_capsule = 0
+        distance_to_food_scared = 0
+        distance_to_base = 0
+        stop_penalty = 0
+        reverse_penalty = 0
+            
         
         if num_food > 0:  # This should always be True,  but better safe than sorry
-            min_distance = min([self.get_maze_distance(my_pos, food) for food in food_list])
-            oFeatures['distance_to_food'] = min_distance
+            distance_to_food = min([self.get_maze_distance(my_pos, food) for food in food_list]) * -2.0
+            #oFeatures['distance_to_food'] = min_distance
         
         if len(capsules_list) > 0:
-            min_distance = min([self.get_maze_distance(my_pos, capsule) for capsule in capsules_list])
-            oFeatures['distance_to_capsule'] = min_distance
+            distance_to_capsule = min([self.get_maze_distance(my_pos, capsule) for capsule in capsules_list]) * -1.0
+            #oFeatures['distance_to_capsule'] = min_distance
         
         scared_ghosts = [agent for agent in self.get_opponents(game_state) 
                      if game_state.get_agent_state(agent).scared_timer > 0]  
     
         if scared_ghosts:
-            min_distance = min([self.get_maze_distance(my_pos, food) for food in food_list])
-            oFeatures['distance_to_food_scared'] = min_distance
+            distance_to_food_scared = min([self.get_maze_distance(my_pos, food) for food in food_list]) * -5.0
+            #oFeatures['distance_to_food_scared'] = min_distance
         
-        if self.food_carried > 0.05 * num_food:
-            min_distance = min([self.get_maze_distance(my_pos,position) for position in middle_of_board])
-            oFeatures['distance_to_base'] = min_distance
+        if game_state.get_agent_state(self.index).num_carrying > 4:   ##PODE NAO SER ASSIM------------------------------------------------------------------------------------------------------
+            dsitance_to_base = min([self.get_maze_distance(my_pos,position) for position in middle_of_board]) * -5.0
+            #oFeatures['distance_to_base'] = min_distance
 
-        if action == Directions.STOP: oFeatures['stop'] = 1
+        if action == Directions.STOP: stop_penalty = 1
         rev = Directions.REVERSE[game_state.get_agent_state(self.index).configuration.direction]
-        if action == rev: oFeatures['reverse'] = 1
+        if action == rev: reverse_penalty = 1
         
-        return oFeatures
+        score = distance_to_food + distance_to_capsule + distance_to_food_scared + distance_to_base + stop_penalty + reverse_penalty
+        return score
 
+    #DEF get patrol points------------------------------------------------------------------------------------------------------------------------------------
 
-    def get_offensive_weights(self,game_state, action):
-        return {'successor_score': 1.0, 'next_food_score':100.0,
-            'distance_to_food': -1.0, 'distance_to_capsule':-2.0 , 'distance_to_food_scared':-5.0 , 'distance_to_base': -3.0, 'stop': -100.0, 'reverse': -2.0}
+    #def get_offensive_weights(self,game_state, action):
+     #   return {'successor_score': 1.0, 'next_food_score':100.0,
+      #      'distance_to_food': -1.0, 'distance_to_capsule':-2.0 , 'distance_to_food_scared':-5.0 , 'distance_to_base': -3.0, 'stop': -100.0, 'reverse': -2.0}
 
-        
-    def update_food_carried(self,game_state,action):
-        food_list = self.get_food(game_state).as_list()
-        successor = self.get_successor(game_state, action)
-        my_state = successor.get_agent_state(self.index)
-        my_pos = my_state.get_position()
-        if my_pos in food_list:
-            self.food_carried += 1
 
 class MyTeamDefensive(MyTeamBaseAgent):
     """
@@ -331,7 +330,7 @@ class MyTeamDefensive(MyTeamBaseAgent):
             return None
         else:
             for action in actions:
-                current_q_value = self.evaluate(game_state,action)
+                current_q_value = self.get_defensive_features(game_state,action)
                 if current_q_value >= highest_q_value:
                     highest_q_value = current_q_value
                     best_actions.append(action) 
@@ -344,7 +343,7 @@ class MyTeamDefensive(MyTeamBaseAgent):
         Evaluate the state for defensive features.
         """
         weights = self.get_defensive_weights(game_state, action)
-        return  self.get_defensive_features(game_state,action) * weights'''
+        return  self.get_defensive_features(game_state,action) * weights
     
     def evaluate(self, game_state, action):
     
@@ -357,14 +356,14 @@ class MyTeamDefensive(MyTeamBaseAgent):
             weight = weights.get(feature, 0)  # Default weight to 0 if the feature is missing
             score += value * weight
 
-        return score
+        return score'''
 
 
 
     def get_defensive_features(self,game_state,action):
-        dFeatures = util.Counter()
+        #dFeatures = util.Counter()
         successor = self.get_successor(game_state, action)
-        dFeatures['successor_score'] = self.get_score(successor)
+        #dFeatures['successor_score'] = self.get_score(successor)
         my_state = successor.get_agent_state(self.index)
         my_pos = my_state.get_position()
         food_list = self.get_food_you_are_defending(successor).as_list()
@@ -374,32 +373,41 @@ class MyTeamDefensive(MyTeamBaseAgent):
         height = game_state.data.layout.height
         
         
+        distance_to_food = 0
+        num_invaders = 0
+        invader_distance = 0
+        distance_to_middle = 0
+        distance_to_middle_scared = 0
+        stop_penalty = 0
+        reverse_penalty = 0
+            
         
         
         if len(food_list) > 0:  # This should always be True,  but better safe than sorry
-            min_distance = min([self.get_maze_distance(my_pos, food) for food in food_list])
-            dFeatures['distance_to_your_food'] = min_distance
+            distance_to_food = min([self.get_maze_distance(my_pos, food) for food in food_list]) * -2.0
+            #dFeatures['distance_to_your_food'] = min_distance
         
         enemies = [successor.get_agent_state(i) for i in self.get_opponents(successor)]
         invaders = [a for a in enemies if a.is_pacman and a.get_position() is not None]
-        dFeatures['num_invaders'] = len(invaders)
+        num_invaders = len(invaders) * -1000.0 
         if len(invaders) > 0:
-            dists = [self.get_maze_distance(my_pos, a.get_position()) for a in invaders]
-            dFeatures['invader_distance'] = min(dists)
+            invader_distance = min([self.get_maze_distance(my_pos, a.get_position()) for a in invaders]) * -10.0
+            #dFeatures['invader_distance'] = min(dists)
         
-        dFeatures['distance_to_middle'] = min([self.get_maze_distance(my_pos,(width/2 - 1, height / 2 - 1))])
+        #dFeatures['distance_to_middle'] = min([self.get_maze_distance(my_pos,(width/2 - 1, height / 2 - 1))])
+        distance_to_middle = min([self.get_maze_distance(my_pos,(width/2 - 1, height / 2 - 1))]) * -3.0
 
         scared_team = [agent for agent in self.get_team(game_state) 
                      if game_state.get_agent_state(agent).scared_timer > 0]  
     
         if scared_team:
-            min_distance = min([self.get_maze_distance(my_pos, (width/2 - 1, height / 2 - 1))])
-            dFeatures['distance_to_middle_scared'] = min_distance
+            distance_to_middle_scared = min([self.get_maze_distance(my_pos, (width/2 - 1, height / 2 - 1))]) * -5.0
+            #dFeatures['distance_to_middle_scared'] = min_distance
 
 
-        if action == Directions.STOP: dFeatures['stop'] = 1
+        if action == Directions.STOP: stop_penalty = 1
         rev = Directions.REVERSE[game_state.get_agent_state(self.index).configuration.direction]
-        if action == rev: dFeatures['reverse'] = 1
+        if action == rev: reverse_penalty = 1
         
         '''
         walls = game_state.get_walls()
@@ -407,9 +415,8 @@ class MyTeamDefensive(MyTeamBaseAgent):
         if len(wall_positions) > 0:
             min_wall_dist = min(self.get_maze_distance(my_pos, wall) for wall in wall_positions)
             dFeatures['distance_to_wall'] = min_wall_dist'''
-
-        return dFeatures
-
-    def get_defensive_weights(self,game_state, action):
-        return {'successor_score': 1.0,'distance_to_your_food': 5.0,
-            'num_invaders': -1000.0,'invader_distance': -10.0, 'distance_to_middle': -3.0, 'distance_to_middle_scared': -5.0, 'stop': -100.0, 'reverse': -2.0} #'distance_to_wall': -1.0 }
+        score = distance_to_food + num_invaders + invader_distance + distance_to_middle + distance_to_middle_scared + stop_penalty + reverse_penalty
+        return score
+    #def get_defensive_weights(self,game_state, action):
+     #   return {'successor_score': 1.0,'distance_to_your_food': 5.0,
+      #      'num_invaders': -1000.0,'invader_distance': -10.0, 'distance_to_middle': -3.0, 'distance_to_middle_scared': -5.0, 'stop': -100.0, 'reverse': -2.0} #'distance_to_wall': -1.0 }
