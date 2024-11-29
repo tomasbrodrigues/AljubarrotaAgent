@@ -46,8 +46,8 @@ class ReflexCaptureAgent(CaptureAgent):
     A base class for reflex agents that choose score-maximizing actions
     """
 
-    def __init__(self, index, time_for_computing=.1):
-        super().__init__(index, time_for_computing)
+    def init(self, index, time_for_computing=.1):
+        super().init(index, time_for_computing)
         self.start = None
 
     def register_initial_state(self, game_state):
@@ -189,8 +189,8 @@ class MyTeamBaseAgent(CaptureAgent):
     Base class for MyTeam agents with shared methods.
     """
 
-    def __init__(self, index, time_for_computing=.1):
-        super().__init__(index, time_for_computing)
+    def init(self, index, time_for_computing=.1):
+        super().init(index, time_for_computing)
         self.start = None
         self.food_carried = 0
 
@@ -239,13 +239,24 @@ class MyTeamOffensive(MyTeamBaseAgent):
             return best_action
 
 
-    def evaluate(self, game_state, action):
+    '''def evaluate(self, game_state, action):
         """
         Evaluate the state for offensive features.
         """
-        weights = self.get_weights(game_state, action)
+        weights = self.get_offensive_weights(game_state, action)
         if(game_state.get_agent_state(self.index).is_pacman):
-            return self.get_offensive_features(game_state,action) * weights
+            return self.get_offensive_features(game_state,action) * weights'''
+    def evaluate(self, game_state, action):
+    
+        features = self.get_offensive_features(game_state, action)
+        weights = self.get_offensive_weights(game_state, action)
+
+        score = 0
+        for feature, value in features.items():
+            weight = weights.get(feature, 0)  # Default weight to 0 if the feature is missing
+            score += value * weight
+
+        return score
 
 
     def get_offensive_features(self,game_state,action):
@@ -257,7 +268,7 @@ class MyTeamOffensive(MyTeamBaseAgent):
         food_list = self.get_food(successor).as_list()
         num_food = len(food_list)
         oFeatures['next_food_score'] = -len(food_list)  # self.getScore(successor)
-        capsules_list = self.get_capsules(game_state).as_list()
+        capsules_list = self.get_capsules(game_state)
         width = game_state.data.layout.width
         height = game_state.data.layout.height
         
@@ -290,7 +301,7 @@ class MyTeamOffensive(MyTeamBaseAgent):
         return oFeatures
 
 
-    def get_offensive_weights(self):
+    def get_offensive_weights(self,game_state, action):
         return {'successor_score': 1.0, 'next_food_score':100.0,
             'distance_to_food': -1.0, 'distance_to_capsule':-2.0 , 'distance_to_food_scared':-5.0 , 'distance_to_base': -3.0, 'stop': -100.0, 'reverse': -2.0}
 
@@ -328,12 +339,25 @@ class MyTeamDefensive(MyTeamBaseAgent):
             
             return best_action
 
-    def evaluate(self, game_state, action):
+    '''def evaluate(self, game_state, action):
         """
         Evaluate the state for defensive features.
         """
-        weights = self.get_weights(game_state, action)
-        return  self.get_defensive_features(game_state,action) * weights
+        weights = self.get_defensive_weights(game_state, action)
+        return  self.get_defensive_features(game_state,action) * weights'''
+    
+    def evaluate(self, game_state, action):
+    
+        features = self.get_defensive_features(game_state, action)
+        weights = self.get_defensive_weights(game_state, action)
+
+       
+        score = 0
+        for feature, value in features.items():
+            weight = weights.get(feature, 0)  # Default weight to 0 if the feature is missing
+            score += value * weight
+
+        return score
 
 
 
@@ -377,15 +401,15 @@ class MyTeamDefensive(MyTeamBaseAgent):
         rev = Directions.REVERSE[game_state.get_agent_state(self.index).configuration.direction]
         if action == rev: dFeatures['reverse'] = 1
         
-        # Add defensive boundary and wall penalties
+        '''
         walls = game_state.get_walls()
         wall_positions = [(x, y) for x in range(walls.width) for y in range(walls.height) if walls[x][y]]
         if len(wall_positions) > 0:
             min_wall_dist = min(self.get_maze_distance(my_pos, wall) for wall in wall_positions)
-            dFeatures['distance_to_wall'] = min_wall_dist
+            dFeatures['distance_to_wall'] = min_wall_dist'''
 
         return dFeatures
 
-    def get_defensive_weights(self):
+    def get_defensive_weights(self,game_state, action):
         return {'successor_score': 1.0,'distance_to_your_food': 5.0,
-            'num_invaders': -1000.0,'invader_distance': -10.0, 'distance_to_middle': -3.0, 'distance_to_middle_scared': -5.0, 'stop': -100.0, 'reverse': -2.0, 'distance_to_wall': -1.0 }
+            'num_invaders': -1000.0,'invader_distance': -10.0, 'distance_to_middle': -3.0, 'distance_to_middle_scared': -5.0, 'stop': -100.0, 'reverse': -2.0} #'distance_to_wall': -1.0 }
