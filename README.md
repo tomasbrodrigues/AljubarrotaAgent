@@ -6,4 +6,4 @@ Developed as part of an Artificial Intelligence course during my Erasmus in Barc
 
 ### 🏆 Competition
 
-This work was presented at an international student competition, where our team achieved 30th place.
+This work was presented at an international student competition, where our team finished in the top 20% of participants.
